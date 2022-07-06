@@ -7,7 +7,7 @@ import (
 )
 
 func TestClient(t *testing.T) {
-	c := New("http://localhost:8080/")
+	c := New("http://localhost:8080")
 
 	r, err := c.Invoke("echo", map[string]string{
 		"name": "zero",

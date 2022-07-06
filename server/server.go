@@ -48,105 +48,112 @@ func New(port int, cfg ...*Config) *Server {
 
 // Start starts the JSONRPC server.
 func (s *Server) Start() {
-	http.HandleFunc(s.Path, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
+	logger.Info("Starting JSONRPC server at port: %d", s.Port)
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", s.Port), s); err != nil {
+		logger.Error("Failed to start JSONRPC server: %s", err)
+	}
+}
 
-		bytes, err := io.ReadAll(r.Body)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != s.Path {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
 
-		body := gjson.Parse(string(bytes))
-		if !body.Get("jsonrpc").Exists() {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			response, _ := json.Encode(map[string]any{
-				"jsonrpc": "2.0",
-				"error": map[string]any{
-					"code":    -32600,
-					"message": "Invalid Request",
-				},
-				"id": nil,
-			})
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
 
-			w.Write(response)
-			return
-		}
+	bytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
 
-		jsonrpc := body.Get("jsonrpc").String()
-		if jsonrpc != "2.0" {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			response, _ := json.Encode(map[string]any{
-				"jsonrpc": "2.0",
-				"error": map[string]any{
-					"code":    -32600,
-					"message": "Invlid JSONRPC Version",
-				},
-				"id": nil,
-			})
-
-			w.Write(response)
-			return
-		}
-
-		method := body.Get("method").String()
-		params := body.Get("params")
-		id := body.Get("id").Int()
-
-		if !s.has(method) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			response, _ := json.Encode(map[string]any{
-				"jsonrpc": "2.0",
-				"error": map[string]any{
-					"code":    -32601,
-					"message": "Method not found",
-				},
-				"id": nil,
-			})
-			w.Write(response)
-			return
-		}
-
-		var result map[string]any
-		err = safe.Do(func() error {
-			result = s.invoke(method, params)
-			return nil
-		})
-		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusInternalServerError)
-			response, _ := json.Encode(map[string]any{
-				"jsonrpc": "2.0",
-				"error": map[string]any{
-					"code":    -32000,
-					"message": err.Error(),
-				},
-				"id": nil,
-			})
-
-			w.Write(response)
-			return
-		}
-
+	body := gjson.Parse(string(bytes))
+	if !body.Get("jsonrpc").Exists() {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusBadRequest)
 		response, _ := json.Encode(map[string]any{
 			"jsonrpc": "2.0",
-			"result":  result,
-			"id":      id,
+			"error": map[string]any{
+				"code":    -32600,
+				"message": "Invalid Request",
+			},
+			"id": nil,
 		})
 
 		w.Write(response)
+		return
+	}
+
+	jsonrpc := body.Get("jsonrpc").String()
+	if jsonrpc != "2.0" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		response, _ := json.Encode(map[string]any{
+			"jsonrpc": "2.0",
+			"error": map[string]any{
+				"code":    -32600,
+				"message": "Invlid JSONRPC Version",
+			},
+			"id": nil,
+		})
+
+		w.Write(response)
+		return
+	}
+
+	method := body.Get("method").String()
+	params := body.Get("params")
+	id := body.Get("id").Int()
+
+	if !s.has(method) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		response, _ := json.Encode(map[string]any{
+			"jsonrpc": "2.0",
+			"error": map[string]any{
+				"code":    -32601,
+				"message": "Method not found",
+			},
+			"id": nil,
+		})
+		w.Write(response)
+		return
+	}
+
+	var result map[string]any
+	err = safe.Do(func() error {
+		result = s.invoke(method, params)
+		return nil
+	})
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		response, _ := json.Encode(map[string]any{
+			"jsonrpc": "2.0",
+			"error": map[string]any{
+				"code":    -32000,
+				"message": err.Error(),
+			},
+			"id": nil,
+		})
+
+		w.Write(response)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	response, _ := json.Encode(map[string]any{
+		"jsonrpc": "2.0",
+		"result":  result,
+		"id":      id,
 	})
 
-	logger.Info("Starting JSONRPC server at port: %d", s.Port)
-	http.ListenAndServe(fmt.Sprintf(":%d", s.Port), nil)
+	w.Write(response)
 }
 
 func (s *Server) has(method string) bool {
