@@ -10,7 +10,7 @@ import (
 func TestServer(t *testing.T) {
 	s := New()
 
-	s.Register("echo", func(params gjson.Result) Result {
+	s.Register("echo", func(ctx *Context, params gjson.Result) Result {
 		logger.Info("params: %s", params.String())
 
 		return Result{

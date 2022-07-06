@@ -23,14 +23,22 @@ type Config struct {
 }
 
 // Method is a JSONRPC method.
-type Method func(params gjson.Result) Result
+type Method func(ctx *Context, params Params) Result
+
+// Context is a JSONRPC context.
+type Context struct {
+	Request *http.Request
+}
+
+// Params is a JSONRPC params.
+type Params = gjson.Result
 
 // Result is a JSONRPC result.
 type Result map[string]any
 
 // New creates a new JSONRPC server.
 func New(cfg ...*Config) *Server {
-	path := "/"
+	path := ""
 	if len(cfg) > 0 && cfg[0] != nil {
 		if cfg[0].Path != "" {
 			path = cfg[0].Path
@@ -52,7 +60,7 @@ func (s *Server) Start(addr string) {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != s.Path {
+	if s.Path != "" && r.URL.Path != s.Path {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
@@ -61,6 +69,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
+
+	//
 
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -122,8 +132,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var result map[string]any
+	context := &Context{
+		Request: r,
+	}
+
 	err = safe.Do(func() error {
-		result = s.invoke(method, params)
+		result = s.invoke(context, method, params)
 		return nil
 	})
 	if err != nil {
@@ -158,8 +172,8 @@ func (s *Server) has(method string) bool {
 	return ok
 }
 
-func (s *Server) invoke(method string, params gjson.Result) Result {
-	return s.methods[method](params)
+func (s *Server) invoke(ctx *Context, method string, params gjson.Result) Result {
+	return s.methods[method](ctx, params)
 }
 
 // Register registers a method.
