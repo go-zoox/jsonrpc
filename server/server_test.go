@@ -8,7 +8,7 @@ import (
 )
 
 func TestServer(t *testing.T) {
-	s := New(8080)
+	s := New()
 
 	s.Register("echo", func(params gjson.Result) Result {
 		logger.Info("params: %s", params.String())
@@ -19,5 +19,5 @@ func TestServer(t *testing.T) {
 		}
 	})
 
-	s.Start()
+	s.Start(":8080")
 }

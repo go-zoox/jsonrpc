@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 
@@ -13,7 +12,6 @@ import (
 
 // Server is a JSONRPC server.
 type Server struct {
-	Port int
 	Path string
 	//
 	methods map[string]Method
@@ -31,7 +29,7 @@ type Method func(params gjson.Result) Result
 type Result map[string]any
 
 // New creates a new JSONRPC server.
-func New(port int, cfg ...*Config) *Server {
+func New(cfg ...*Config) *Server {
 	path := "/"
 	if len(cfg) > 0 && cfg[0] != nil {
 		if cfg[0].Path != "" {
@@ -40,16 +38,15 @@ func New(port int, cfg ...*Config) *Server {
 	}
 
 	return &Server{
-		Port:    port,
 		Path:    path,
 		methods: map[string]Method{},
 	}
 }
 
 // Start starts the JSONRPC server.
-func (s *Server) Start() {
-	logger.Info("Starting JSONRPC server at port: %d", s.Port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", s.Port), s); err != nil {
+func (s *Server) Start(addr string) {
+	logger.Info("Starting JSONRPC server at: %s", addr)
+	if err := http.ListenAndServe(addr, s); err != nil {
 		logger.Error("Failed to start JSONRPC server: %s", err)
 	}
 }
