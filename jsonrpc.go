@@ -11,6 +11,6 @@ func NewClient(uri string, cfg ...*client.Config) *client.Client {
 }
 
 // NewServer creates a JSONRPC server.
-func NewServer(port int, cfg ...*server.Config) *server.Server {
-	return server.New(port, cfg...)
+func NewServer(cfg ...*server.Config) *server.Server {
+	return server.New(cfg...)
 }
