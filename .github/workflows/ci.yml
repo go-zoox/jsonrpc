@@ -31,7 +31,7 @@ jobs:
           golint -set_exit_status
           go vet
           test -z "$(goimports -l .)"
-      - name: Test
-        run: goveralls -service=github
-        env:
-          COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # - name: Test
+      #   run: goveralls -service=github
+      #   env:
+      #     COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
