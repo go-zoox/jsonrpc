@@ -19,35 +19,57 @@ go get github.com/go-zoox/jsonrpc
 
 ```go
 // server
+package main
+
+import (
+	"context"
+
+	"github.com/go-zoox/jsonrpc"
+	"github.com/go-zoox/jsonrpc/server"
+	"github.com/go-zoox/logger"
+)
+
 func main() {
-  s := jsonrpc.NewServer(8080)
+	s := server.New()
 
-	s.Register("echo", func(params gjson.Result) Result {
-		logger.Info("params: %s", params.String())
+	s.Register("echo", func(ctx context.Context, params jsonrpc.Params) (jsonrpc.Result, error) {
+		logger.Info("params: %s", params)
 
-		return Result{
-			"name": params.Get("name").String(),
+		return jsonrpc.Result{
+			"name": params.Get("name"),
 			"age":  18,
-		}
+		}, nil
 	})
 
-	s.Start()
+	s.Run()
 }
 ```
 
 ```go
 // client
-func main() {
-  c := jsonrpc.NewClient("http://localhost:8080/")
+package main
 
-	r, err := c.Invoke("echo", map[string]string{
+import (
+	"context"
+
+	"github.com/go-zoox/core-utils/cast"
+	"github.com/go-zoox/jsonrpc"
+	"github.com/go-zoox/jsonrpc/client"
+	"github.com/go-zoox/logger"
+)
+
+func main() {
+	c := client.New("http://localhost:8080")
+
+	r, err := c.Call(context.Background(), "echo", jsonrpc.Params{
 		"name": "zero",
 	})
 	if err != nil {
-		t.Fatal(err)
+		logger.Errorf("failed to call: %s", err)
+		return
 	}
 
-	logger.Info("result: %d", r.Get("age").Int())
+	logger.Info("result: %d", cast.ToInt64(r.Get("age")))
 }
 ```
 

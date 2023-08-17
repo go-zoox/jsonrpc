@@ -1,64 +1,67 @@
 package client
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/go-zoox/fetch"
-	"github.com/tidwall/gjson"
+	"github.com/go-zoox/jsonrpc"
+	"github.com/go-zoox/uuid"
 )
 
-// Client is a JSONRPC client.
-type Client struct {
-	ServerURI string
-	Count     int
-	//
-	Config *Config
+// Client is a JSON-RPC client.
+type Client interface {
+	Call(ctx context.Context, method string, params jsonrpc.Params) (jsonrpc.Result, error)
 }
 
-// Config is a JSONRPC client configuration.
-type Config struct {
-	Headers map[string]string
-	Query   map[string]string
+type client struct {
+	server string
+	path   string
 }
 
-// New creates a JSONRPC client.
-func New(uri string, cfg ...*Config) *Client {
-	var config *Config
-	if len(cfg) > 0 && cfg[0] != nil {
-		config = cfg[0]
-	} else {
-		config = &Config{}
+// New creates a new JSON-RPC client.
+func New(server string, path ...string) Client {
+	pathX := jsonrpc.JSONRPCDefaultPath
+	if len(path) > 0 {
+		if path[0] != "" {
+			pathX = path[0]
+		}
 	}
 
-	return &Client{
-		ServerURI: uri,
-		Config:    config,
+	return &client{
+		server: server,
+		path:   pathX,
 	}
 }
 
-// Invoke invokes a JSONRPC method.
-func (c *Client) Invoke(method string, params any) (gjson.Result, error) {
-	c.Count += 1
-	response, err := fetch.Post(c.ServerURI, &fetch.Config{
-		Headers: c.Config.Headers,
-		Query:   c.Config.Query,
+// Call calls a JSON-RPC method.
+func (c *client) Call(ctx context.Context, method string, params jsonrpc.Params) (jsonrpc.Result, error) {
+	response, err := fetch.Post(c.server+c.path, &fetch.Config{
 		Body: map[string]any{
 			"jsonrpc": "2.0",
 			"method":  method,
 			"params":  params,
-			"id":      c.Count,
+			"id":      uuid.V4(),
 		},
 	})
 	if err != nil {
-		return gjson.Result{}, err
+		return nil, err
 	}
 
-	if response.Status != 200 {
-		err := response.Get("error")
-		code := err.Get("code").Int()
-		message := err.Get("message").String()
-		return gjson.Result{}, fmt.Errorf("[%d] %s", code, message)
+	var res jsonrpc.Response
+	err = json.Unmarshal(response.Body, &res)
+	if err != nil {
+		return nil, err
 	}
 
-	return response.Get("result"), nil
+	if res.JSONRPC != jsonrpc.JSONRPCVersion {
+		return nil, fmt.Errorf("invalid jsonrpc version: %s", res.JSONRPC)
+	}
+
+	if res.Error != nil && res.Error.Code != 0 {
+		return nil, fmt.Errorf("[%d] %s", res.Error.Code, res.Error.Message)
+	}
+
+	return res.Result, nil
 }

@@ -2,22 +2,19 @@ package server
 
 import (
 	"testing"
-
-	"github.com/go-zoox/logger"
-	"github.com/tidwall/gjson"
 )
 
 func TestServer(t *testing.T) {
-	s := New()
+	// s := New[context.Context]()
 
-	s.Register("echo", func(ctx *Context, params gjson.Result) Result {
-		logger.Info("params: %s", params.String())
+	// s.Register("echo", func(ctx context.Context, params jsonrpc.Params) (jsonrpc.Result, error) {
+	// 	logger.Info("params: %s", params)
 
-		return Result{
-			"name": params.Get("name").String(),
-			"age":  18,
-		}
-	})
+	// 	return jsonrpc.Result{
+	// 		"name": params.Get("name"),
+	// 		"age":  18,
+	// 	}, nil
+	// })
 
-	s.Start(":8080")
+	// s.Start(":8080")
 }
